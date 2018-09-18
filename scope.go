@@ -343,9 +343,12 @@ func (scope *Scope) QuotedTableName() (name string) {
 func (scope *Scope) CombinedConditionSql() string {
 	joinSQL := scope.joinsSQL()
 	whereSQL := scope.whereSQL()
+
 	if scope.Search.raw {
-		whereSQL = strings.TrimSuffix(strings.TrimPrefix(whereSQL, "WHERE ("), ")")
+		// moved to scope.whereSQL()
+		// whereSQL = strings.TrimSuffix(strings.TrimPrefix(whereSQL, "WHERE ("), ")")
 	}
+
 	return joinSQL + whereSQL + scope.groupSQL() +
 		scope.havingSQL() + scope.orderSQL() + scope.limitAndOffsetSQL()
 }
@@ -725,9 +728,14 @@ func (scope *Scope) whereSQL() (sql string) {
 		}
 	}
 
-	for _, clause := range scope.Search.whereConditions {
+	for index, clause := range scope.Search.whereConditions {
 		if sql := scope.buildCondition(clause, true); sql != "" {
-			andConditions = append(andConditions, sql)
+			if scope.Search.raw && index == 0 {
+				andConditions = append(andConditions,
+					strings.TrimSuffix(strings.TrimPrefix(sql, "("), ")"))
+			} else {
+				andConditions = append(andConditions, sql)
+			}
 		}
 	}
 
@@ -759,7 +767,11 @@ func (scope *Scope) whereSQL() (sql string) {
 			sql = sql + " AND (" + combinedSQL + ")"
 		}
 	} else if len(combinedSQL) > 0 {
-		sql = "WHERE " + combinedSQL
+		if scope.Search.raw {
+			sql = combinedSQL
+		} else {
+			sql = "WHERE " + combinedSQL
+		}
 	}
 	return
 }
